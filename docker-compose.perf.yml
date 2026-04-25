@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: perf-webapp
+    env_file:
+      - ./perf/project.env
+    ports:
+      - "${APP_PORT:-8080}:${APP_PORT:-8080}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${APP_PORT:-8080}${HEALTH_PATH:-/api/health} || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  k6:
+    image: grafana/k6:latest
+    container_name: perf-k6
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./perf/k6:/perf:ro
+    env_file:
+      - ./perf/project.env
+    environment:
+      BASE_URL: http://app:${APP_PORT:-8080}
+    command: ["run", "/perf/load-test.js"]
